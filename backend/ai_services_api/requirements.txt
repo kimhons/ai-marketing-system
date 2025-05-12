@@ -1,0 +1,8 @@
+Flask>=3.0.0
+psycopg2-binary>=2.9.0
+openai>=1.0.0
+python-dotenv>=1.0.0
+Flask-CORS>=4.0.0
+# Add other specific dependencies if BlueprintService or CustomerMatcherService have them directly
+# and are not covered by the above (e.g., if they used a specific library for a task not via LLMService)
+

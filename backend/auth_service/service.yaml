@@ -1,0 +1,79 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: auth-service
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+    # Replace {your-gcp-project-id} and {your-gcp-region} with your actual GCP project ID and region
+    # run.googleapis.com/ingress: "all" # Default, can be internal-and-cloud-load-balancing or internal
+    # run.googleapis.com/cpu-throttling: "false" # if you don't want CPU to be throttled when not processing requests
+spec:
+  template:
+    metadata:
+      annotations:
+        # run.googleapis.com/container-dependencies: "{\"auth-service\":[\"cloudsql-proxy\"]}" # If using Cloud SQL Proxy as a sidecar
+        autoscaling.knative.dev/maxScale: "5" # Example: max 5 instances
+    spec:
+      containerConcurrency: 80 # Default, adjust as needed
+      timeoutSeconds: 300 # Default, adjust as needed
+      serviceAccountName: "your-service-account-email@your-gcp-project-id.iam.gserviceaccount.com" # Replace with your service account
+      containers:
+      - image: "gcr.io/your-gcp-project-id/auth-service:latest"  # Replace with your image path in GCR/Artifact Registry
+        ports:
+        - name: http1
+          containerPort: 5001 # Port exposed by the auth_service (as per its Dockerfile and main.py)
+        env:
+        - name: PORT
+          value: "5001"
+        - name: FLASK_ENV 
+          value: "production" # Ensure this is set for production
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: auth-db-credentials # Name of the secret in Secret Manager
+              key: database-url # Key within the secret (e.g., the whole URL string)
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: jwt-secret # Name of the secret in Secret Manager
+              key: secret-key # Key within the secret
+        resources:
+          limits:
+            cpu: "1000m"
+            memory: "512Mi"
+          # requests: # Optional: specify requests if needed
+          #   cpu: "250m"
+          #   memory: "256Mi"
+        startupProbe:
+          timeoutSeconds: 240
+          periodSeconds: 240
+          failureThreshold: 1
+          tcpSocket:
+            port: 5001
+
+      # If using Cloud SQL Proxy as a sidecar (recommended for connecting to Cloud SQL)
+      # - name: cloudsql-proxy
+      #   image: "gcr.io/cloudsql-docker/gce-proxy:1.33.9" # Use the latest version
+      #   args:
+      #     - "--structured-logs"
+      #     - "--port=5432" # Or your DB port
+      #     - "your-gcp-project-id:your-gcp-region:your-cloudsql-instance-name" # Replace with your Cloud SQL instance connection name
+      #   securityContext:
+      #     runAsNonRoot: true
+      #   resources:
+      #     requests:
+      #       memory: "128Mi"
+      #       cpu: "100m"
+
+# Note: 
+# 1. Replace placeholders like {your-gcp-project-id}, {your-gcp-region}, your-service-account-email, your-cloudsql-instance-name.
+# 2. The image path `gcr.io/your-gcp-project-id/auth-service:latest` assumes you will build the Docker image from `backend/auth_service/Dockerfile` 
+#    and push it to Google Container Registry (GCR) or Artifact Registry.
+# 3. Secrets (DATABASE_URL, JWT_SECRET_KEY) should be stored in Google Secret Manager and referenced as shown.
+#    You will need to create these secrets in Secret Manager first.
+# 4. If connecting to a Cloud SQL PostgreSQL instance, uncomment and configure the `cloudsql-proxy` sidecar container.
+#    The `DATABASE_URL` in your application would then point to `localhost:5432` (or the proxy's port) 
+#    and the proxy handles the secure connection to Cloud SQL.
+# 5. Ensure the service account used by Cloud Run has permissions for Secret Manager (to access secrets) 
+#    and Cloud SQL Client (if using Cloud SQL proxy).
+

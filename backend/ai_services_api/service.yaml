@@ -1,0 +1,101 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: ai-services-api # Name of your Cloud Run service
+  annotations:
+    run.googleapis.com/launch-stage: BETA
+    # Replace {your-gcp-project-id} and {your-gcp-region} with your actual GCP project ID and region
+spec:
+  template:
+    metadata:
+      annotations:
+        # run.googleapis.com/container-dependencies: "{\"ai-services-api\":[\"cloudsql-proxy\"]}" # If using Cloud SQL Proxy as a sidecar
+        autoscaling.knative.dev/maxScale: "10" # Example: max 10 instances
+    spec:
+      containerConcurrency: 80 # Default, adjust as needed
+      timeoutSeconds: 300 # Default, adjust as needed
+      serviceAccountName: "your-service-account-email@your-gcp-project-id.iam.gserviceaccount.com" # Replace with your service account
+      containers:
+      - image: "gcr.io/your-gcp-project-id/ai-services-api:latest"  # Replace with your image path in GCR/Artifact Registry
+        ports:
+        - name: http1
+          containerPort: 5002 # Port exposed by the ai_services_api (as per its Dockerfile and main.py)
+        env:
+        - name: PORT
+          value: "5002"
+        - name: FLASK_ENV 
+          value: "production"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: ai-db-credentials
+              key: db-user
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ai-db-credentials
+              key: db-password
+        - name: DB_HOST
+          # If using Cloud SQL Proxy sidecar, this would be 127.0.0.1 or the proxy's service name
+          # Otherwise, it's the direct IP or Cloud SQL instance connection name (if proxy not in this container)
+          valueFrom:
+            secretKeyRef:
+              name: ai-db-credentials
+              key: db-host 
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: ai-db-credentials
+              key: db-port
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: ai-db-credentials
+              key: db-name
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: openai-api-key
+              key: api-key
+        # - name: JWT_SECRET_KEY # If this service needs to validate JWTs
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: jwt-secret
+        #       key: secret-key
+        resources:
+          limits:
+            cpu: "2000m" # 2 vCPU
+            memory: "1Gi"
+        startupProbe:
+          timeoutSeconds: 240
+          periodSeconds: 240
+          failureThreshold: 1
+          tcpSocket:
+            port: 5002
+
+      # If using Cloud SQL Proxy as a sidecar (recommended for connecting to Cloud SQL)
+      # - name: cloudsql-proxy
+      #   image: "gcr.io/cloudsql-docker/gce-proxy:1.33.9" # Use the latest version
+      #   args:
+      #     - "--structured-logs"
+      #     - "--port=5432" # Or your DB port
+      #     - "your-gcp-project-id:your-gcp-region:your-cloudsql-instance-name" # Replace with your Cloud SQL instance connection name
+      #   securityContext:
+      #     runAsNonRoot: true
+      #   resources:
+      #     requests:
+      #       memory: "128Mi"
+      #       cpu: "100m"
+
+# Note: 
+# 1. Replace placeholders like {your-gcp-project-id}, {your-gcp-region}, your-service-account-email, your-cloudsql-instance-name.
+# 2. The image path `gcr.io/your-gcp-project-id/ai-services-api:latest` assumes you will build the Docker image from `backend/ai_services_api/Dockerfile` 
+#    and push it to Google Container Registry (GCR) or Artifact Registry.
+# 3. Secrets (DB credentials, OPENAI_API_KEY) should be stored in Google Secret Manager and referenced as shown.
+#    You will need to create these secrets in Secret Manager first.
+# 4. If connecting to a Cloud SQL PostgreSQL instance, uncomment and configure the `cloudsql-proxy` sidecar container.
+#    The `DB_HOST` in your application would then point to `127.0.0.1` (or the proxy's port) 
+#    and the proxy handles the secure connection to Cloud SQL. The `DB_HOST` secret would then be `127.0.0.1`.
+# 5. Ensure the service account used by Cloud Run has permissions for Secret Manager (to access secrets) 
+#    and Cloud SQL Client (if using Cloud SQL proxy).
+

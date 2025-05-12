@@ -1,0 +1,134 @@
+swagger: "2.0"
+info:
+  title: "AI Marketing System API Gateway"
+  description: "API Gateway for the AI Marketing System, routing requests to backend services."
+  version: "1.0.0"
+schemes:
+  - "https"
+produces:
+  - "application/json"
+
+# Security definitions for JWT authentication
+securityDefinitions:
+  JwtAuth:
+    type: "apiKey"
+    name: "Authorization"
+    in: "header"
+    x-google-issuer: "https://ai-marketing-system-auth-service" # Replace with your actual JWT issuer
+    x-google-jwks_uri: "https://ai-marketing-system-auth-service/.well-known/jwks.json" # Replace with your actual JWKS URI
+    x-google-audiences: "ai-marketing-system-clients" # Replace with your actual audience
+
+paths:
+  # Authentication Service Routes
+  /auth/register:
+    post:
+      summary: "Register a new user."
+      operationId: "registerUser"
+      x-google-backend:
+        address: "https://auth-service-PROJECT_HASH-REGION.a.run.app"
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        "201":
+          description: "User registered successfully."
+        "400":
+          description: "Invalid input or user already exists."
+        "500":
+          description: "Internal server error."
+
+  /auth/login:
+    post:
+      summary: "Log in an existing user."
+      operationId: "loginUser"
+      x-google-backend:
+        address: "https://auth-service-PROJECT_HASH-REGION.a.run.app"
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        "200":
+          description: "Login successful, returns JWT token."
+        "401":
+          description: "Invalid credentials."
+        "500":
+          description: "Internal server error."
+
+  # Blueprint Service Routes
+  /api/blueprint/generate:
+    post:
+      summary: "Generate a new marketing blueprint."
+      operationId: "generateBlueprint"
+      security:
+        - JwtAuth: []
+      x-google-backend:
+        address: "https://ai-services-api-PROJECT_HASH-REGION.a.run.app"
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        "201":
+          description: "Blueprint generated and saved successfully."
+        "400":
+          description: "Invalid input."
+        "401":
+          description: "Unauthorized."
+        "500":
+          description: "Internal server error."
+
+  /api/blueprint/{blueprint_id}:
+    get:
+      summary: "Get a specific marketing blueprint by ID."
+      operationId: "getBlueprintById"
+      security:
+        - JwtAuth: []
+      parameters:
+        - name: "blueprint_id"
+          in: "path"
+          required: true
+          type: "string"
+      x-google-backend:
+        address: "https://ai-services-api-PROJECT_HASH-REGION.a.run.app"
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        "200":
+          description: "Blueprint details."
+        "401":
+          description: "Unauthorized."
+        "404":
+          description: "Blueprint not found."
+        "500":
+          description: "Internal server error."
+
+  /api/blueprint/business/{business_id}:
+    get:
+      summary: "Get all blueprints for a specific business ID."
+      operationId: "getBlueprintsByBusinessId"
+      security:
+        - JwtAuth: []
+      parameters:
+        - name: "business_id"
+          in: "path"
+          required: true
+          type: "string"
+      x-google-backend:
+        address: "https://ai-services-api-PROJECT_HASH-REGION.a.run.app"
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        "200":
+          description: "List of blueprints."
+        "401":
+          description: "Unauthorized."
+        "500":
+          description: "Internal server error."
+
+  # Customer Matcher Service Routes
+  /api/matcher/match:
+    post:
+      summary: "Find matched businesses for a customer query."
+      operationId: "matchCustomerQuery"
+      # No security requirement - this endpoint is public for customer queries
+      x-google-backend:
+        address: "https://ai-services-api-PROJECT_HASH-REGION.a.run.app"
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        "200":
+          description: "List of matched businesses."
+        "400":
+          description: "Invalid input."
+        "500":
+          description: "Internal server error."
