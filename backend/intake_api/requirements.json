@@ -1,0 +1,12 @@
+{
+    "name": "intake_form_api",
+    "version": "1.0.0",
+    "description": "API for Business Intake Form",
+    "dependencies": {
+        "Flask": "2.0.1",
+        "Flask-SQLAlchemy": "2.5.1",
+        "psycopg2-binary": "2.9.9",
+        "python-dotenv": "0.21.0",
+        "requests": "2.32.3"
+    }
+}
